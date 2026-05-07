@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: legalai-backend
+    env: python
+    buildCommand: "apt-get install -y tesseract-ocr && pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+      - key: DATABASE_NAME
+        value: legal_assistant
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 60
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MAX_FILE_SIZE_MB
+        value: 10
+      - key: ALLOWED_ORIGINS
+        sync: false
