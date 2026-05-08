@@ -65,10 +65,14 @@ app.add_middleware(
     max_age=600,
 )
 
-# Static files for uploads
+# Static files for uploads - handle gracefully if directory not writable
 import os
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+try:
+    os.makedirs("uploads", exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+    logger.info("Uploads directory mounted successfully")
+except Exception as e:
+    logger.warning(f"Could not mount uploads directory: {e}")
 
 # Include routers
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
