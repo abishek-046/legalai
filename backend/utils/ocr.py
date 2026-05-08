@@ -104,9 +104,18 @@ def extract_from_image(file_bytes: bytes) -> str:
         return cleaned
 
     except ImportError:
-        logger.error("pytesseract or Pillow not installed")
-        raise RuntimeError("Image OCR library not available")
+        logger.error("pytesseract not installed - image OCR unavailable")
+        raise RuntimeError(
+            "Image OCR is not available on this server. "
+            "Please upload a PDF or DOCX file instead."
+        )
     except Exception as e:
+        # Tesseract binary not found
+        if "tesseract" in str(e).lower():
+            raise RuntimeError(
+                "Tesseract OCR is not installed on this server. "
+                "Please upload a PDF or DOCX file instead."
+            )
         logger.error(f"Image OCR error: {e}")
         raise RuntimeError(f"Failed to extract text from image: {str(e)}")
 
