@@ -17,7 +17,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     OPENAI_API_KEY: str = ""
     MAX_FILE_SIZE_MB: int = 10
-    ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: Union[List[str], str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://legalai-q2y8.vercel.app",
+    ]
 
     @property
     def origins_list(self) -> List[str]:
