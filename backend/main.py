@@ -32,7 +32,12 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown."""
     logger.info("Starting Legal Assistant API...")
-    await connect_db()
+    try:
+        await connect_db()
+        logger.info("Database connected successfully")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        logger.warning("Starting without database - some features will be unavailable")
     yield
     logger.info("Shutting down Legal Assistant API...")
     await disconnect_db()
@@ -76,4 +81,19 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    from database import db
+    db_status = "connected" if db is not None else "disconnected"
+    return {"status": "healthy", "database": db_status}
+
+
+@app.get("/debug")
+async def debug():
+    """Debug endpoint to check environment variables are loaded."""
+    from config import settings
+    return {
+        "mongodb_url_set": bool(settings.MONGODB_URL and "mongodb" in settings.MONGODB_URL),
+        "openai_key_set": bool(settings.OPENAI_API_KEY and len(settings.OPENAI_API_KEY) > 5),
+        "secret_key_set": bool(settings.SECRET_KEY),
+        "database_name": settings.DATABASE_NAME,
+        "allowed_origins": settings.origins_list,
+    }
