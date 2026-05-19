@@ -78,8 +78,17 @@ async def health_check():
     return {"status": "healthy", "database": db_status}
 
 
-@app.get("/debug")
-async def debug():
+@app.get("/test-db")
+async def test_db():
+    """Test Supabase connection and table access."""
+    from config import settings
+    try:
+        from database import get_supabase
+        sb = get_supabase()
+        result = sb.table("users").select("id").limit(1).execute()
+        return {"status": "ok", "users_table": "accessible", "data": result.data}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
     from config import settings
     url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
     return {
