@@ -87,19 +87,24 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    from database import db
-    db_status = "connected" if db is not None else "disconnected"
+    try:
+        from database import get_supabase
+        sb = get_supabase()
+        sb.table("users").select("id").limit(1).execute()
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"disconnected: {str(e)}"
     return {"status": "healthy", "database": db_status}
 
 
 @app.get("/debug")
 async def debug():
-    """Debug endpoint to check environment variables are loaded."""
     from config import settings
     return {
-        "mongodb_url_set": bool(settings.MONGODB_URL and "mongodb" in settings.MONGODB_URL),
+        "supabase_url_set": bool(settings.SUPABASE_URL and "supabase" in settings.SUPABASE_URL),
+        "supabase_key_set": bool(settings.SUPABASE_KEY and len(settings.SUPABASE_KEY) > 10),
+        "supabase_service_key_set": bool(settings.SUPABASE_SERVICE_KEY and len(settings.SUPABASE_SERVICE_KEY) > 10),
         "openai_key_set": bool(settings.OPENAI_API_KEY and len(settings.OPENAI_API_KEY) > 5),
         "secret_key_set": bool(settings.SECRET_KEY),
-        "database_name": settings.DATABASE_NAME,
         "allowed_origins": settings.origins_list,
     }

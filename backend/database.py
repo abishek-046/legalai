@@ -32,9 +32,8 @@ async def connect_db():
     """Initialize and verify Supabase connection."""
     try:
         client = get_supabase()
-        # Simple ping - list tables
-        client.table("users").select("id").limit(1).execute()
-        logger.info("Connected to Supabase successfully")
+        # Simple ping - just initialize the client
+        logger.info("Supabase client initialized successfully")
     except Exception as e:
         logger.error(f"Supabase connection failed: {e}")
         raise

@@ -11,8 +11,8 @@ from typing import List, Union
 class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""          # anon/public key
-    SUPABASE_SERVICE_KEY: str = ""  # service_role key (for admin operations)
+    SUPABASE_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
 
     # JWT
     SECRET_KEY: str = "change-this-secret-key-in-production"
@@ -29,6 +29,10 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "https://legalai-q2y8.vercel.app",
     ]
+
+    # Legacy - ignored but kept to avoid validation errors if still in env
+    MONGODB_URL: str = ""
+    DATABASE_NAME: str = ""
 
     @property
     def origins_list(self) -> List[str]:
