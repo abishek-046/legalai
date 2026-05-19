@@ -78,7 +78,18 @@ async def health_check():
     return {"status": "healthy", "database": db_status}
 
 
-@app.get("/test-db")
+@app.get("/test-register")
+async def test_register():
+    """Test the full registration flow."""
+    try:
+        from services.auth_service import register_user, create_access_token
+        import time
+        test_email = f"test{int(time.time())}@test.com"
+        user = await register_user("Test User", test_email, "password123")
+        token = create_access_token({"sub": str(user["id"])})
+        return {"status": "ok", "user_id": str(user["id"]), "email": test_email}
+    except Exception as e:
+        return {"status": "error", "detail": str(e), "type": type(e).__name__}
 async def test_db():
     """Test Supabase connection and table access."""
     try:
