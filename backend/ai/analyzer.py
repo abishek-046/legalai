@@ -49,15 +49,25 @@ async def analyze_legal_document(extracted_text: str) -> dict:
     Send extracted document text to OpenAI and return structured analysis.
     Falls back to a mock analysis if OpenAI API key is not configured.
     """
-    if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY.startswith("sk-your"):
+    key = settings.OPENAI_API_KEY.strip()
+
+    # Check if key is missing or is a placeholder
+    if not key or key.startswith("sk-your") or key == "demo" or len(key) < 20:
         logger.warning("OpenAI API key not configured - returning mock analysis")
         return _mock_analysis(extracted_text)
 
-    # Truncate text to avoid token limits (keep first 6000 chars)
-    text_to_analyze = extracted_text[:6000] if len(extracted_text) > 6000 else extracted_text
+    # Truncate text to avoid token limits (keep first 4000 chars for speed)
+    text_to_analyze = extracted_text[:4000] if len(extracted_text) > 4000 else extracted_text
 
     try:
-        response = await client.chat.completions.create(
+        # Use a fresh client with the clean key and explicit timeout
+        from openai import AsyncOpenAI
+        ai_client = AsyncOpenAI(
+            api_key=key,
+            timeout=25.0,  # 25 second timeout to stay under Render's 30s limit
+        )
+
+        response = await ai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -70,7 +80,7 @@ async def analyze_legal_document(extracted_text: str) -> dict:
                 },
             ],
             temperature=0.3,
-            max_tokens=2000,
+            max_tokens=1500,
             response_format={"type": "json_object"},
         )
 
@@ -83,8 +93,9 @@ async def analyze_legal_document(extracted_text: str) -> dict:
         logger.error(f"Failed to parse AI response as JSON: {e}")
         return _mock_analysis(extracted_text)
     except Exception as e:
-        logger.error(f"OpenAI API error: {e}")
-        raise
+        logger.error(f"OpenAI API error: {type(e).__name__}: {e}")
+        # Return mock instead of crashing so user gets some result
+        return _mock_analysis(extracted_text)
 
 
 def _validate_analysis(analysis: dict) -> dict:
