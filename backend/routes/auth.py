@@ -4,7 +4,7 @@ Supabase version - uses user["id"] (UUID) instead of MongoDB ObjectId.
 """
 
 import logging
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
