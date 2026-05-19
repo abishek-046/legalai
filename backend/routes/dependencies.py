@@ -1,5 +1,6 @@
 """
 FastAPI dependency injection - JWT authentication guard
+Supabase version - uses user["id"] (UUID).
 """
 
 import logging
@@ -15,10 +16,7 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
-    """
-    Dependency that validates the JWT token and returns the current user.
-    Raises 401 if token is invalid or user not found.
-    """
+    """Validate JWT and return the current user dict."""
     token = credentials.credentials
     payload = decode_token(token)
 

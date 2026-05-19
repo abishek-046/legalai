@@ -1,39 +1,45 @@
 """
-MongoDB database connection using Motor (async driver)
+Supabase database connection
+Uses the supabase-py client (sync wrapped for FastAPI compatibility)
 """
 
 import logging
-from motor.motor_asyncio import AsyncIOMotorClient
+from supabase import create_client, Client
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-client: AsyncIOMotorClient = None
-db = None
+_client: Client = None
+
+
+def get_supabase() -> Client:
+    """Return the Supabase client instance."""
+    global _client
+    if _client is None:
+        if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
+            raise RuntimeError("SUPABASE_URL and SUPABASE_KEY must be set")
+        _client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    return _client
+
+
+def get_admin_supabase() -> Client:
+    """Return a Supabase client with service_role key for admin operations."""
+    key = settings.SUPABASE_SERVICE_KEY or settings.SUPABASE_KEY
+    return create_client(settings.SUPABASE_URL, key)
 
 
 async def connect_db():
-    """Connect to MongoDB."""
-    global client, db
+    """Initialize and verify Supabase connection."""
     try:
-        client = AsyncIOMotorClient(settings.MONGODB_URL)
-        db = client[settings.DATABASE_NAME]
-        # Verify connection
-        await client.admin.command("ping")
-        logger.info(f"Connected to MongoDB: {settings.DATABASE_NAME}")
+        client = get_supabase()
+        # Simple ping - list tables
+        client.table("users").select("id").limit(1).execute()
+        logger.info("Connected to Supabase successfully")
     except Exception as e:
-        logger.error(f"Failed to connect to MongoDB: {e}")
+        logger.error(f"Supabase connection failed: {e}")
         raise
 
 
 async def disconnect_db():
-    """Disconnect from MongoDB."""
-    global client
-    if client:
-        client.close()
-        logger.info("Disconnected from MongoDB")
-
-
-def get_database():
-    """Return the database instance."""
-    return db
+    """No persistent connection to close with supabase-py."""
+    logger.info("Supabase client released")

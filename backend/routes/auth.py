@@ -1,5 +1,6 @@
 """
 Authentication routes - register, login
+Supabase version - uses user["id"] (UUID) instead of MongoDB ObjectId.
 """
 
 import logging
@@ -24,15 +25,15 @@ limiter = Limiter(key_func=get_remote_address)
 async def register(request: Request, user_data: UserCreate):
     """Register a new user and return a JWT token."""
     user = await register_user(user_data.name, user_data.email, user_data.password)
-    token = create_access_token({"sub": str(user["_id"])})
+    token = create_access_token({"sub": str(user["id"])})
 
     return TokenResponse(
         access_token=token,
         user=UserResponse(
-            id=str(user["_id"]),
+            id=str(user["id"]),
             name=user["name"],
             email=user["email"],
-            createdAt=user["createdAt"],
+            createdAt=user["created_at"],
         ),
     )
 
@@ -42,14 +43,14 @@ async def register(request: Request, user_data: UserCreate):
 async def login(request: Request, credentials: UserLogin):
     """Authenticate user and return a JWT token."""
     user = await authenticate_user(credentials.email, credentials.password)
-    token = create_access_token({"sub": str(user["_id"])})
+    token = create_access_token({"sub": str(user["id"])})
 
     return TokenResponse(
         access_token=token,
         user=UserResponse(
-            id=str(user["_id"]),
+            id=str(user["id"]),
             name=user["name"],
             email=user["email"],
-            createdAt=user["createdAt"],
+            createdAt=user["created_at"],
         ),
     )
