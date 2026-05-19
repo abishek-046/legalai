@@ -63,7 +63,7 @@ async def analyze_document(
     if not extracted_text or len(extracted_text.strip()) < 10:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not extract readable text from the document.",
+            detail="Could not extract readable text from the document. Please upload a text-based PDF or DOCX file. Scanned/image PDFs are not supported.",
         )
 
     # AI analysis
