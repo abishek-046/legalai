@@ -18,14 +18,19 @@ def get_supabase() -> Client:
     if _client is None:
         if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
             raise RuntimeError("SUPABASE_URL and SUPABASE_KEY must be set")
-        _client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        # Strip any invisible/non-printable characters from URL and key
+        url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
+        key = "".join(c for c in settings.SUPABASE_KEY if c.isprintable()).strip()
+        _client = create_client(url, key)
     return _client
 
 
 def get_admin_supabase() -> Client:
     """Return a Supabase client with service_role key for admin operations."""
+    url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
     key = settings.SUPABASE_SERVICE_KEY or settings.SUPABASE_KEY
-    return create_client(settings.SUPABASE_URL, key)
+    key = "".join(c for c in key if c.isprintable()).strip()
+    return create_client(url, key)
 
 
 async def connect_db():

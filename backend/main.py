@@ -100,8 +100,13 @@ async def health_check():
 @app.get("/debug")
 async def debug():
     from config import settings
+    url = settings.SUPABASE_URL
+    url_clean = "".join(c for c in url if c.isprintable()).strip()
     return {
-        "supabase_url_set": bool(settings.SUPABASE_URL and "supabase" in settings.SUPABASE_URL),
+        "supabase_url_raw_length": len(url),
+        "supabase_url_clean_length": len(url_clean),
+        "supabase_url_preview": url_clean[:40] if url_clean else "NOT SET",
+        "supabase_url_set": bool(url_clean and "supabase" in url_clean),
         "supabase_key_set": bool(settings.SUPABASE_KEY and len(settings.SUPABASE_KEY) > 10),
         "supabase_service_key_set": bool(settings.SUPABASE_SERVICE_KEY and len(settings.SUPABASE_SERVICE_KEY) > 10),
         "openai_key_set": bool(settings.OPENAI_API_KEY and len(settings.OPENAI_API_KEY) > 5),
