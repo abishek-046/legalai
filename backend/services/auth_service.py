@@ -16,16 +16,24 @@ from database import get_supabase
 
 logger = logging.getLogger(__name__)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b",
+)
 
 
 def hash_password(password: str) -> str:
-    # Truncate to 72 bytes as bcrypt limit
-    return pwd_context.hash(password[:72])
+    """Hash password - truncate to 72 bytes for bcrypt compatibility."""
+    truncated = password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+    return pwd_context.hash(truncated)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain[:72], hashed)
+    """Verify password with same truncation."""
+    truncated = plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+    return pwd_context.verify(truncated, hashed)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
