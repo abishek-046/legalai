@@ -1,46 +1,56 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { Scale, Menu, X, LogOut, LayoutDashboard, Upload, User } from 'lucide-react'
+import { Scale, Menu, X, LogOut, ChevronDown } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-    setMenuOpen(false)
-  }
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
-  const navLinkClass = ({ isActive }) =>
-    `text-sm font-medium transition-colors duration-200 ${
-      isActive ? 'text-primary-400' : 'text-gray-300 hover:text-white'
+  const handleLogout = () => { logout(); navigate('/'); setMenuOpen(false) }
+
+  const navLink = ({ isActive }) =>
+    `text-sm font-medium transition-all duration-200 px-3 py-1.5 rounded-lg ${
+      isActive
+        ? 'text-gold-400 bg-gold-400/10'
+        : 'text-slate-400 hover:text-white hover:bg-white/5'
     }`
 
   return (
-    <nav className="bg-navy-900 border-b border-navy-800 sticky top-0 z-50">
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      scrolled ? 'bg-dark-600/95 backdrop-blur-xl border-b border-white/5 shadow-2xl' : 'bg-transparent'
+    }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center group-hover:bg-primary-500 transition-colors">
-              <Scale className="w-5 h-5 text-white" />
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 15px rgba(245,158,11,0.4)' }}>
+              <Scale className="w-5 h-5 text-dark-600" />
             </div>
-            <span className="text-white font-bold text-lg">
-              Legal<span className="text-primary-400">AI</span>
-            </span>
+            <div>
+              <span className="text-white font-bold text-lg leading-none">
+                Legal<span className="text-gold-gradient">AI</span>
+              </span>
+            </div>
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-6">
-            <NavLink to="/" className={navLinkClass} end>Home</NavLink>
-            <NavLink to="/about" className={navLinkClass}>About</NavLink>
+          <div className="hidden md:flex items-center gap-1">
+            <NavLink to="/" className={navLink} end>Home</NavLink>
+            <NavLink to="/about" className={navLink}>About</NavLink>
             {isAuthenticated && (
               <>
-                <NavLink to="/upload" className={navLinkClass}>Upload</NavLink>
-                <NavLink to="/dashboard" className={navLinkClass}>Dashboard</NavLink>
+                <NavLink to="/upload" className={navLink}>Upload</NavLink>
+                <NavLink to="/dashboard" className={navLink}>Dashboard</NavLink>
               </>
             )}
           </div>
@@ -49,28 +59,25 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-gray-300 text-sm">
-                  <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+                  style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-dark-600"
+                    style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                    {user?.name?.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden lg:block">{user?.name}</span>
+                  <span className="text-gold-400 text-sm font-medium hidden lg:block">{user?.name}</span>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-red-400 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
+                <button onClick={handleLogout}
+                  className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-red-400 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-400/10">
+                  <LogOut className="w-4 h-4" /> Logout
                 </button>
               </div>
             ) : (
               <>
-                <Link to="/login" className="text-sm text-gray-300 hover:text-white transition-colors font-medium">
+                <Link to="/login" className="text-sm text-slate-400 hover:text-white transition-colors font-medium px-3 py-1.5">
                   Sign In
                 </Link>
-                <Link to="/register" className="btn-primary text-sm py-2 px-4">
+                <Link to="/register" className="btn-gold text-sm py-2 px-5">
                   Get Started
                 </Link>
               </>
@@ -78,36 +85,38 @@ export default function Navbar() {
           </div>
 
           {/* Mobile menu button */}
-          <button
-            className="md:hidden text-gray-300 hover:text-white"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
-          >
-            {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          <button className="md:hidden text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5"
+            onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden bg-navy-900 border-t border-navy-800 px-4 py-4 space-y-3 animate-fade-in">
-          <NavLink to="/" className="block text-gray-300 hover:text-white py-2" onClick={() => setMenuOpen(false)} end>Home</NavLink>
-          <NavLink to="/about" className="block text-gray-300 hover:text-white py-2" onClick={() => setMenuOpen(false)}>About</NavLink>
-          {isAuthenticated ? (
+        <div className="md:hidden border-t border-white/5 px-4 py-4 space-y-1 animate-fade-in"
+          style={{ background: 'rgba(4,13,24,0.98)', backdropFilter: 'blur(20px)' }}>
+          {[['/', 'Home', true], ['/about', 'About', false]].map(([to, label, end]) => (
+            <NavLink key={to} to={to} end={end}
+              className="block px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+              onClick={() => setMenuOpen(false)}>{label}</NavLink>
+          ))}
+          {isAuthenticated && (
             <>
-              <NavLink to="/upload" className="block text-gray-300 hover:text-white py-2" onClick={() => setMenuOpen(false)}>Upload Document</NavLink>
-              <NavLink to="/dashboard" className="block text-gray-300 hover:text-white py-2" onClick={() => setMenuOpen(false)}>Dashboard</NavLink>
-              <div className="pt-2 border-t border-navy-800">
-                <p className="text-gray-400 text-sm mb-2">Signed in as {user?.name}</p>
-                <button onClick={handleLogout} className="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm">
+              <NavLink to="/upload" className="block px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5" onClick={() => setMenuOpen(false)}>Upload</NavLink>
+              <NavLink to="/dashboard" className="block px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5" onClick={() => setMenuOpen(false)}>Dashboard</NavLink>
+              <div className="pt-3 mt-3 border-t border-white/5">
+                <p className="text-gold-400 text-sm px-3 mb-2">{user?.name}</p>
+                <button onClick={handleLogout} className="flex items-center gap-2 text-red-400 text-sm px-3 py-2 rounded-xl hover:bg-red-400/10 w-full">
                   <LogOut className="w-4 h-4" /> Logout
                 </button>
               </div>
             </>
-          ) : (
-            <div className="pt-2 border-t border-navy-800 flex flex-col gap-2">
-              <Link to="/login" className="text-gray-300 hover:text-white py-2" onClick={() => setMenuOpen(false)}>Sign In</Link>
-              <Link to="/register" className="btn-primary text-sm py-2 text-center" onClick={() => setMenuOpen(false)}>Get Started</Link>
+          )}
+          {!isAuthenticated && (
+            <div className="pt-3 mt-3 border-t border-white/5 flex flex-col gap-2">
+              <Link to="/login" className="px-3 py-2.5 text-slate-400 hover:text-white" onClick={() => setMenuOpen(false)}>Sign In</Link>
+              <Link to="/register" className="btn-gold text-sm py-2.5 text-center" onClick={() => setMenuOpen(false)}>Get Started</Link>
             </div>
           )}
         </div>
