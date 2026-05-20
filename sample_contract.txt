@@ -1,0 +1,45 @@
+SERVICE AGREEMENT CONTRACT
+
+This Service Agreement ("Agreement") is entered into as of January 1, 2025, between:
+
+CLIENT: John Smith, residing at 123 Main Street, Chennai, Tamil Nadu, India ("Client")
+SERVICE PROVIDER: TechSolutions Pvt Ltd, registered at 456 Business Park, Bangalore, Karnataka, India ("Provider")
+
+1. SERVICES
+The Provider agrees to develop a mobile application for the Client. The project will be completed within 90 days from the date of signing. Any delays caused by the Client will extend the deadline accordingly.
+
+2. PAYMENT TERMS
+The Client agrees to pay a total fee of INR 5,00,000 (Five Lakhs) as follows:
+- 50% upfront payment due within 3 days of signing this agreement
+- 25% upon completion of first milestone
+- 25% upon final delivery
+
+Late payments will incur a penalty of 5% per week on the outstanding amount. The Provider reserves the right to suspend work if payment is delayed by more than 7 days.
+
+3. INTELLECTUAL PROPERTY
+All work, code, designs, and deliverables created under this Agreement shall remain the exclusive property of the Provider until full payment is received. The Client shall have no rights to use, modify, or distribute any deliverables until complete payment is made.
+
+4. CONFIDENTIALITY
+The Client agrees to keep all technical information, pricing, and business processes of the Provider strictly confidential for a period of 5 years. Violation of this clause will result in a penalty of INR 10,00,000.
+
+5. TERMINATION
+The Provider may terminate this Agreement at any time with 7 days notice. Upon termination, the Client forfeits all payments made and has no right to claim any deliverables or refunds.
+
+6. LIABILITY
+The Provider's total liability under this Agreement shall not exceed INR 10,000 regardless of the nature of the claim. The Provider is not liable for any loss of business, data, or profits.
+
+7. DISPUTE RESOLUTION
+Any disputes shall be resolved exclusively in the courts of Bangalore, Karnataka. The Client waives the right to seek resolution in any other jurisdiction.
+
+8. AMENDMENTS
+The Provider reserves the right to modify the terms of this Agreement at any time without prior notice to the Client.
+
+9. GOVERNING LAW
+This Agreement shall be governed by the laws of Karnataka, India.
+
+10. ENTIRE AGREEMENT
+This Agreement constitutes the entire agreement between the parties and supersedes all prior negotiations.
+
+Signed:
+Client: _________________ Date: _________
+Provider: _______________ Date: _________
