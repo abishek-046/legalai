@@ -44,22 +44,10 @@ export default function Register() {
   }
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-    if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: '' })
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
   }
-
-  const Field = ({ label, name, type = 'text', placeholder, autoComplete, icon: Icon, extra }) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1.5">{label}</label>
-      <div className="relative">
-        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input type={type} name={name} value={form[name]} onChange={handleChange}
-          placeholder={placeholder} autoComplete={autoComplete}
-          className={`input-dark pl-10 ${extra || ''} ${errors[name] ? 'ring-1 ring-red-500' : ''}`} />
-      </div>
-      {errors[name] && <p className="text-red-400 text-xs mt-1">{errors[name]}</p>}
-    </div>
-  )
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 pt-24"
@@ -68,6 +56,7 @@ export default function Register() {
         style={{ background: 'radial-gradient(circle, #f59e0b, transparent)' }} />
 
       <div className="w-full max-w-md animate-slide-up relative">
+        {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-glow"
             style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
@@ -77,36 +66,117 @@ export default function Register() {
           <p className="text-slate-400 mt-1 text-sm">Start analyzing legal documents for free</p>
         </div>
 
+        {/* Card */}
         <div className="glass p-8" style={{ background: 'rgba(255,255,255,0.04)' }}>
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            <Field label="Full Name" name="name" placeholder="John Smith" autoComplete="name" icon={User} />
-            <Field label="Email Address" name="email" type="email" placeholder="you@example.com" autoComplete="email" icon={Mail} />
+
+            {/* Full Name */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+              <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Full Name
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type={showPassword ? 'text' : 'password'} name="password" value={form.password}
-                  onChange={handleChange} placeholder="Min. 6 characters" autoComplete="new-password"
-                  className={`input-dark pl-10 pr-10 ${errors.password ? 'ring-1 ring-red-500' : ''}`} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <input
+                  id="name"
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="John Smith"
+                  autoComplete="name"
+                  className={`input-dark pl-10 ${errors.name ? 'ring-1 ring-red-500' : ''}`}
+                />
+              </div>
+              {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+            </div>
+
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <input
+                  id="email"
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  className={`input-dark pl-10 ${errors.email ? 'ring-1 ring-red-500' : ''}`}
+                />
+              </div>
+              {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder="Min. 6 characters"
+                  autoComplete="new-password"
+                  className={`input-dark pl-10 pr-10 ${errors.password ? 'ring-1 ring-red-500' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password}</p>}
             </div>
-            <Field label="Confirm Password" name="confirmPassword"
-              type={showPassword ? 'text' : 'password'} placeholder="Repeat your password"
-              autoComplete="new-password" icon={Lock} />
 
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <input
+                  id="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                  className={`input-dark pl-10 ${errors.confirmPassword ? 'ring-1 ring-red-500' : ''}`}
+                />
+              </div>
+              {errors.confirmPassword && <p className="text-red-400 text-xs mt-1">{errors.confirmPassword}</p>}
+            </div>
+
+            {/* Submit */}
             <button type="submit" disabled={loading} className="btn-gold w-full justify-center py-3 mt-2">
-              {loading ? <LoadingSpinner size="sm" /> : <><UserPlus className="w-4 h-4" />Create Account</>}
+              {loading
+                ? <LoadingSpinner size="sm" />
+                : <><UserPlus className="w-4 h-4" />Create Account</>
+              }
             </button>
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Already have an account?{' '}
-            <Link to="/login" className="text-gold-400 font-semibold hover:text-gold-300 transition-colors">Sign in</Link>
+            <Link to="/login" className="text-gold-400 font-semibold hover:text-gold-300 transition-colors">
+              Sign in
+            </Link>
           </p>
         </div>
       </div>
