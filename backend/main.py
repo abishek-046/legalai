@@ -101,7 +101,30 @@ async def test_db():
         return {"status": "error", "detail": str(e)}
 
 
-@app.get("/debug")
+@app.get("/test-pdf")
+async def test_pdf_extraction():
+    """Test what each PDF extraction method returns for debugging."""
+    return {
+        "message": "POST a PDF file to /api/analyze to test extraction",
+        "pymupdf_available": _check_pymupdf(),
+        "pdfplumber_available": _check_pdfplumber(),
+    }
+
+
+def _check_pymupdf():
+    try:
+        import fitz
+        return f"available v{fitz.version[0]}"
+    except ImportError:
+        return "NOT installed"
+
+
+def _check_pdfplumber():
+    try:
+        import pdfplumber
+        return "available"
+    except ImportError:
+        return "NOT installed"
 async def debug():
     from config import settings
     url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
