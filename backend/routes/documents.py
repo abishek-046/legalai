@@ -99,9 +99,8 @@ async def analyze_document(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
                 "Could not extract readable text from this document. "
-                "For PDFs: ensure the file is not password-protected. "
-                "For scanned documents: ensure the scan quality is clear. "
-                "For images: ensure the text is clearly visible and not rotated."
+                "The file may be a scanned image or protected PDF. "
+                "Please try a different file or ensure the document contains readable text."
             ),
         )
 
