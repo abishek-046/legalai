@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 from config import settings
 from routes.dependencies import get_current_user
 from services.document_service import save_document
-from utils.ocr import extract_text, get_document_type
+from utils.ocr import extract_text_async, get_document_type
 from ai.analyzer import analyze_legal_document
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ async def analyze_document(
 
     # ── Extract text ─────────────────────────────────────────────────────────
     try:
-        extracted_text = extract_text(file_bytes, file.filename)
+        extracted_text = await extract_text_async(file_bytes, file.filename)
     except ValueError as e:
         # Unsupported file type
         logger.warning(f"Unsupported file type '{file.filename}': {e}")

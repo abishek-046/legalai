@@ -2,15 +2,17 @@
 OCR and document text extraction utilities
 
 Extraction pipeline:
-- PDF (text-based)  → pdfplumber  → direct text extraction
-- PDF (scanned)     → PyMuPDF renders pages → extract embedded text blocks
-- DOCX / DOC        → python-docx
-- Images            → PyMuPDF text extraction
+1. PDF (text-based)  → pdfplumber + PyMuPDF direct text
+2. PDF (scanned)     → OCR.space API (cloud OCR, no system deps)
+3. DOCX / DOC        → python-docx
+4. Images            → OCR.space API → pytesseract fallback
 """
 
 import io
+import base64
 import logging
 import re
+import httpx
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -28,47 +30,77 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
+# ─── OCR.space API ────────────────────────────────────────────────────────────
+
+async def _ocr_space_from_bytes(
+    file_bytes: bytes,
+    filename: str,
+    api_key: str,
+    is_pdf: bool = False,
+) -> str:
+    """
+    Send file bytes to OCR.space API and return extracted text.
+    Free tier key: 'helloworld' (25,000 req/month, max 1MB).
+    Get a free key at: https://ocr.space/OCRAPI
+    """
+    try:
+        # Encode file as base64
+        b64 = base64.b64encode(file_bytes).decode("utf-8")
+        ext = Path(filename).suffix.lower().lstrip(".")
+        mime_map = {
+            "pdf": "application/pdf",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "bmp": "image/bmp",
+            "tiff": "image/tiff",
+            "tif": "image/tiff",
+            "webp": "image/webp",
+        }
+        mime = mime_map.get(ext, "application/octet-stream")
+        data_uri = f"data:{mime};base64,{b64}"
+
+        payload = {
+            "apikey": api_key,
+            "base64Image": data_uri,
+            "language": "eng",
+            "isOverlayRequired": False,
+            "detectOrientation": True,
+            "scale": True,
+            "OCREngine": 2,  # Engine 2 is better for printed text
+        }
+
+        if is_pdf:
+            payload["isTable"] = False
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://api.ocr.space/parse/image",
+                data=payload,
+            )
+
+        result = response.json()
+
+        if result.get("IsErroredOnProcessing"):
+            err_msg = result.get("ErrorMessage", ["Unknown OCR error"])
+            logger.warning(f"OCR.space error: {err_msg}")
+            return ""
+
+        parsed = result.get("ParsedResults", [])
+        if not parsed:
+            return ""
+
+        texts = [p.get("ParsedText", "") for p in parsed if p.get("ParsedText")]
+        combined = "\n".join(texts)
+        logger.info(f"OCR.space extracted {len(combined)} chars from {filename}")
+        return combined
+
+    except Exception as e:
+        logger.error(f"OCR.space API failed: {e}")
+        return ""
+
+
 # ─── PDF ──────────────────────────────────────────────────────────────────────
-
-def extract_from_pdf(file_bytes: bytes) -> str:
-    """
-    Smart PDF extraction:
-    1. pdfplumber for text PDFs
-    2. PyMuPDF text layer
-    3. PyMuPDF rendered image text blocks (scanned PDFs)
-    4. PyMuPDF words extraction
-    """
-    logger.info(f"PDF processing: {len(file_bytes)} bytes")
-
-    # Step 1 — pdfplumber
-    text = _try_pdfplumber(file_bytes)
-    if len(text.strip()) >= PDF_MIN_CHARS:
-        logger.info(f"pdfplumber OK: {len(text)} chars")
-        return clean_text(text)
-
-    # Step 2 — PyMuPDF text
-    text2 = _try_pymupdf_text(file_bytes)
-    if len(text2.strip()) >= PDF_MIN_CHARS:
-        logger.info(f"PyMuPDF text OK: {len(text2)} chars")
-        return clean_text(text2)
-
-    # Step 3 — PyMuPDF words (catches more text from complex layouts)
-    text3 = _try_pymupdf_words(file_bytes)
-    if len(text3.strip()) >= PDF_MIN_CHARS:
-        logger.info(f"PyMuPDF words OK: {len(text3)} chars")
-        return clean_text(text3)
-
-    # Step 4 — PyMuPDF blocks (last resort)
-    text4 = _try_pymupdf_blocks(file_bytes)
-    if len(text4.strip()) >= PDF_MIN_CHARS:
-        logger.info(f"PyMuPDF blocks OK: {len(text4)} chars")
-        return clean_text(text4)
-
-    # Return whatever we got
-    best = max([text, text2, text3, text4], key=lambda t: len(t.strip()))
-    logger.warning(f"All PDF methods limited, best: {len(best)} chars")
-    return clean_text(best)
-
 
 def _try_pdfplumber(file_bytes: bytes) -> str:
     try:
@@ -91,54 +123,93 @@ def _try_pymupdf_text(file_bytes: bytes) -> str:
         parts = []
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         for page in doc:
+            # Try multiple extraction modes
             t = page.get_text("text") or ""
+            if len(t.strip()) < PAGE_MIN_CHARS:
+                # Try words mode
+                words = page.get_text("words")
+                if words:
+                    t = " ".join(w[4] for w in words if isinstance(w[4], str))
             if len(t.strip()) >= PAGE_MIN_CHARS:
                 parts.append(t.strip())
         doc.close()
         return "\n\n".join(parts)
     except Exception as e:
-        logger.warning(f"PyMuPDF text: {e}")
+        logger.warning(f"PyMuPDF: {e}")
         return ""
 
 
-def _try_pymupdf_words(file_bytes: bytes) -> str:
-    """Extract using word-level data — better for some layouts."""
+def extract_from_pdf_sync(file_bytes: bytes) -> str:
+    """Synchronous PDF extraction (text-based PDFs only)."""
+    text = _try_pdfplumber(file_bytes)
+    if len(text.strip()) >= PDF_MIN_CHARS:
+        logger.info(f"pdfplumber OK: {len(text)} chars")
+        return clean_text(text)
+
+    text2 = _try_pymupdf_text(file_bytes)
+    if len(text2.strip()) >= PDF_MIN_CHARS:
+        logger.info(f"PyMuPDF OK: {len(text2)} chars")
+        return clean_text(text2)
+
+    return clean_text(text or text2)
+
+
+async def extract_from_pdf(file_bytes: bytes, filename: str = "doc.pdf") -> str:
+    """
+    Full PDF extraction pipeline:
+    1. Try direct text extraction (fast, for text PDFs)
+    2. Fall back to OCR.space (for scanned PDFs)
+    """
+    from config import settings
+
+    logger.info(f"PDF: {filename} ({len(file_bytes)} bytes)")
+
+    # Step 1: direct text extraction
+    text = extract_from_pdf_sync(file_bytes)
+    if len(text.strip()) >= PDF_MIN_CHARS:
+        return text
+
+    # Step 2: OCR.space for scanned PDF
+    logger.info("Direct extraction insufficient — using OCR.space for scanned PDF")
+
+    # OCR.space has 1MB limit on free tier — split large PDFs
+    if len(file_bytes) > 900_000:
+        logger.info("PDF > 900KB — extracting first pages only for OCR")
+        file_bytes = _trim_pdf(file_bytes, max_pages=5)
+
+    ocr_text = await _ocr_space_from_bytes(
+        file_bytes, filename, settings.OCR_SPACE_API_KEY, is_pdf=True
+    )
+
+    if len(ocr_text.strip()) >= 20:
+        logger.info(f"OCR.space PDF OK: {len(ocr_text)} chars")
+        return clean_text(ocr_text)
+
+    # Return whatever we have
+    logger.warning(f"All PDF methods limited. Best: {len(text)} chars")
+    return text
+
+
+def _trim_pdf(file_bytes: bytes, max_pages: int = 5) -> bytes:
+    """Return a PDF with only the first N pages (reduces size for OCR API)."""
     try:
         import fitz
-        parts = []
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        for page in doc:
-            words = page.get_text("words")
-            if words:
-                page_text = " ".join(w[4] for w in words if isinstance(w[4], str))
-                if len(page_text.strip()) >= PAGE_MIN_CHARS:
-                    parts.append(page_text.strip())
-        doc.close()
-        return "\n\n".join(parts)
-    except Exception as e:
-        logger.warning(f"PyMuPDF words: {e}")
-        return ""
+        if len(doc) <= max_pages:
+            doc.close()
+            return file_bytes
 
+        new_doc = fitz.open()
+        for i in range(min(max_pages, len(doc))):
+            new_doc.insert_pdf(doc, from_page=i, to_page=i)
 
-def _try_pymupdf_blocks(file_bytes: bytes) -> str:
-    """Extract using block-level data."""
-    try:
-        import fitz
-        parts = []
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        for page in doc:
-            blocks = page.get_text("blocks")
-            page_parts = []
-            for b in blocks:
-                if isinstance(b[4], str) and b[4].strip():
-                    page_parts.append(b[4].strip())
-            if page_parts:
-                parts.append(" ".join(page_parts))
+        result = new_doc.tobytes()
+        new_doc.close()
         doc.close()
-        return "\n\n".join(parts)
-    except Exception as e:
-        logger.warning(f"PyMuPDF blocks: {e}")
-        return ""
+        logger.info(f"PDF trimmed to {max_pages} pages")
+        return result
+    except Exception:
+        return file_bytes
 
 
 # ─── DOCX ─────────────────────────────────────────────────────────────────────
@@ -169,19 +240,32 @@ def extract_from_docx(file_bytes: bytes) -> str:
 
 # ─── Images ───────────────────────────────────────────────────────────────────
 
-def extract_from_image(file_bytes: bytes, ext: str = ".jpg") -> str:
-    """Extract text from image using PyMuPDF."""
-    logger.info(f"Image processing: {ext}, {len(file_bytes)} bytes")
+async def extract_from_image(file_bytes: bytes, filename: str = "img.jpg") -> str:
+    """Extract text from image using OCR.space API."""
+    from config import settings
 
-    # Try PyMuPDF
-    text = _try_image_pymupdf(file_bytes, ext)
+    logger.info(f"Image OCR: {filename} ({len(file_bytes)} bytes)")
+
+    # Try OCR.space
+    text = await _ocr_space_from_bytes(
+        file_bytes, filename, settings.OCR_SPACE_API_KEY
+    )
     if text.strip():
         return clean_text(text)
 
-    # Try pytesseract
-    text2 = _try_image_tesseract(file_bytes)
-    if text2.strip():
-        return text2
+    # Fallback: pytesseract
+    try:
+        import pytesseract
+        from PIL import Image
+        image = Image.open(io.BytesIO(file_bytes))
+        if image.mode not in ("RGB", "L"):
+            image = image.convert("RGB")
+        t = pytesseract.image_to_string(image, lang="eng")
+        result = clean_text(t)
+        if result:
+            return result
+    except Exception as e:
+        logger.warning(f"pytesseract: {e}")
 
     raise RuntimeError(
         "Could not extract text from this image. "
@@ -189,58 +273,41 @@ def extract_from_image(file_bytes: bytes, ext: str = ".jpg") -> str:
     )
 
 
-def _try_image_pymupdf(file_bytes: bytes, ext: str) -> str:
-    try:
-        import fitz
-        ftype_map = {
-            ".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg",
-            ".bmp": "bmp", ".tiff": "tiff", ".tif": "tiff", ".webp": "webp",
-        }
-        ftype = ftype_map.get(ext.lower(), "png")
-        doc = fitz.open(stream=file_bytes, filetype=ftype)
-        parts = []
-        for page in doc:
-            t = page.get_text("text") or ""
-            if t.strip():
-                parts.append(t.strip())
-        doc.close()
-        return "\n".join(parts)
-    except Exception as e:
-        logger.warning(f"PyMuPDF image: {e}")
-        return ""
-
-
-def _try_image_tesseract(file_bytes: bytes) -> str:
-    try:
-        import pytesseract
-        from PIL import Image
-        image = Image.open(io.BytesIO(file_bytes))
-        if image.mode not in ("RGB", "L"):
-            image = image.convert("RGB")
-        text = pytesseract.image_to_string(image, lang="eng")
-        return clean_text(text)
-    except Exception as e:
-        logger.warning(f"pytesseract: {e}")
-        return ""
-
-
 # ─── Entry Point ──────────────────────────────────────────────────────────────
 
-def extract_text(file_bytes: bytes, filename: str) -> str:
+async def extract_text_async(file_bytes: bytes, filename: str) -> str:
+    """Async entry point for text extraction."""
     ext = Path(filename).suffix.lower()
     if not file_bytes:
         raise ValueError("File is empty")
     if ext == ".pdf":
-        return extract_from_pdf(file_bytes)
+        return await extract_from_pdf(file_bytes, filename)
     elif ext in (".docx", ".doc"):
         return extract_from_docx(file_bytes)
     elif ext in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"):
-        return extract_from_image(file_bytes, ext)
+        return await extract_from_image(file_bytes, filename)
     else:
         raise ValueError(
             f"Unsupported file type: '{ext}'. "
             "Supported: PDF, DOCX, DOC, PNG, JPG, JPEG, WEBP, BMP, TIFF"
         )
+
+
+# Keep sync version for backward compat
+def extract_text(file_bytes: bytes, filename: str) -> str:
+    """Sync wrapper — use extract_text_async for new code."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, extract_text_async(file_bytes, filename))
+                return future.result(timeout=90)
+        else:
+            return loop.run_until_complete(extract_text_async(file_bytes, filename))
+    except Exception as e:
+        raise RuntimeError(str(e))
 
 
 def get_document_type(filename: str) -> str:

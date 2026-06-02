@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     OPENAI_API_KEY: str = ""
+    OCR_SPACE_API_KEY: str = "helloworld"  # Free OCR.space demo key
 
     # App
     MAX_FILE_SIZE_MB: int = 10
