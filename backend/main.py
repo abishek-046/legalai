@@ -94,45 +94,34 @@ async def debug():
 
 @app.get("/test-groq")
 async def test_groq():
-    """Directly test Groq API with the configured key."""
+    """Test all available AI keys."""
     import os
-    from config import settings
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
-    # Check both sources
-    key_from_env = os.environ.get("GROQ_API_KEY", "").strip()
-    key_from_settings = (settings.GROQ_API_KEY or "").strip()
+    result = {
+        "groq_key_set": bool(groq_key),
+        "openai_key_set": bool(openai_key),
+        "openai_key_prefix": openai_key[:8] if openai_key else "NOT SET",
+    }
 
-    if not key_from_env and not key_from_settings:
-        return {
-            "status": "error",
-            "detail": "GROQ_API_KEY is not set on Render",
-            "os_env_keys": [k for k in os.environ.keys() if "GROQ" in k.upper() or "API" in k.upper()],
-        }
+    # Test OpenAI since it's available
+    if openai_key:
+        try:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=openai_key, timeout=10.0)
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "Say OK"}],
+                max_tokens=5,
+            )
+            result["openai_working"] = True
+            result["openai_response"] = response.choices[0].message.content
+        except Exception as e:
+            result["openai_working"] = False
+            result["openai_error"] = str(e)
 
-    key = key_from_env or key_from_settings
-
-    try:
-        from groq import Groq
-        client = Groq(api_key=key)
-        response = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": "Say OK"}],
-            max_tokens=5,
-        )
-        return {
-            "status": "ok",
-            "groq_working": True,
-            "key_source": "os.environ" if key_from_env else "settings",
-            "key_prefix": key[:8],
-            "response": response.choices[0].message.content,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "groq_working": False,
-            "key_prefix": key[:8],
-            "detail": str(e),
-        }
+    return result
 async def test_db():
     try:
         from database import get_supabase

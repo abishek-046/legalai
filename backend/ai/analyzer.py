@@ -47,34 +47,30 @@ Document:
 
 
 async def analyze_legal_document(extracted_text: str) -> dict:
-    """Analyze legal document - tries Groq then OpenAI."""
+    """Analyze legal document using available AI key."""
     import os
 
-    # Read from all possible sources
-    groq_key = (
-        os.environ.get("GROQ_API_KEY", "") or
-        getattr(settings, "GROQ_API_KEY", "") or ""
-    ).strip()
+    # Check all possible keys
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
-    openai_key = (
-        os.environ.get("OPENAI_API_KEY", "") or
-        getattr(settings, "OPENAI_API_KEY", "") or ""
-    ).strip()
+    logger.info(f"Groq key present: {bool(groq_key)}, OpenAI key present: {bool(openai_key)}")
 
-    logger.info(f"Keys available — Groq: {bool(groq_key and len(groq_key)>10)}, OpenAI: {bool(openai_key and len(openai_key)>10)}")
-
+    # Try Groq
     if groq_key and len(groq_key) > 10:
         try:
             return await _analyze_groq(extracted_text, groq_key)
         except Exception as e:
             logger.error(f"Groq failed: {e}")
 
-    if openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-your"):
-        logger.info("Using OpenAI")
+    # Use OpenAI
+    if openai_key and len(openai_key) > 10:
         try:
             return await _analyze_openai(extracted_text, openai_key)
         except Exception as e:
-            logger.error(f"OpenAI failed: {e}")
+            logger.error(f"OpenAI failed: {type(e).__name__}: {e}")
+            # Return error details instead of generic message
+            return _error_response(str(e))
 
     return _no_key_response()
 
@@ -182,6 +178,13 @@ def _validate(a: dict) -> dict:
         a["confidenceScore"] = 75
 
     return a
+
+
+def _error_response(error_detail: str) -> dict:
+    return {**_no_key_response(),
+        "summary": f"AI analysis failed: {error_detail[:200]}",
+        "documentIssues": [f"AI error: {error_detail[:200]}"],
+    }
 
 
 def _no_key_response() -> dict:
