@@ -72,20 +72,21 @@ async def health_check():
 @app.get("/debug")
 async def debug():
     from config import settings
-    openai_key = (settings.OPENAI_API_KEY or "").strip()
+    groq_key = (settings.GROQ_API_KEY or "").strip()
     gemini_key = (settings.GEMINI_API_KEY or "").strip()
+    openai_key = (settings.OPENAI_API_KEY or "").strip()
     url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
     return {
         "supabase_url_set": "supabase" in url,
-        "supabase_url_preview": url[:40] if url else "NOT SET",
         "supabase_key_set": len(settings.SUPABASE_KEY) > 10,
-        "secret_key_set": bool(settings.SECRET_KEY),
-        "openai_key_prefix": openai_key[:8] if openai_key else "NOT SET",
-        "openai_key_valid": len(openai_key) > 20 and not openai_key.startswith("sk-your"),
+        "groq_key_prefix": groq_key[:6] if groq_key else "NOT SET",
+        "groq_key_valid": len(groq_key) > 10 and groq_key.startswith("gsk_"),
         "gemini_key_prefix": gemini_key[:8] if gemini_key else "NOT SET",
         "gemini_key_valid": len(gemini_key) > 10 and gemini_key.startswith("AIzaSy"),
+        "openai_key_valid": len(openai_key) > 20 and not openai_key.startswith("sk-your"),
         "ai_configured": (
-            (len(gemini_key) > 10 and gemini_key.startswith("AIzaSy")) or
+            (len(groq_key) > 10) or
+            (len(gemini_key) > 10) or
             (len(openai_key) > 20 and not openai_key.startswith("sk-your"))
         ),
     }
