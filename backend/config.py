@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""  # Free at https://aistudio.google.com/apikey
     OCR_SPACE_API_KEY: str = "helloworld"  # Free OCR.space demo key
 
     # App

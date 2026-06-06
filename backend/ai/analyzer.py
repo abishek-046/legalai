@@ -1,124 +1,145 @@
 """
-AI Legal Document Analyzer - Enhanced Version
-Analyzes documents for legal status, risks, issues, and generates professional reports.
+AI Legal Document Analyzer
+Uses Google Gemini (free tier) with OpenAI as fallback.
+Get free Gemini key at: https://aistudio.google.com/apikey
 """
 
 import json
 import logging
-from openai import AsyncOpenAI
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-LEGAL_ANALYSIS_PROMPT = """
-You are a senior legal analyst with 20+ years of experience. Analyze the following legal document thoroughly.
+PROMPT = """You are a senior legal analyst. Analyze this legal document and return ONLY a valid JSON object.
 
-Return ONLY a valid JSON object with this EXACT structure (no markdown, no extra text):
-
+Return this exact JSON structure (no markdown, no code blocks, just JSON):
 {{
-  "documentStatus": "Legal" | "Illegal" | "Needs Review",
+  "documentStatus": "Legal" or "Illegal" or "Needs Review",
   "confidenceScore": <integer 0-100>,
-  "summary": "<5-10 sentence plain English summary of what this document is about, its purpose, parties involved, and key obligations>",
-  "riskLevel": "Low" | "Medium" | "High",
-  "riskReason": "<explain why this risk level was assigned, referencing specific clauses>",
-  "documentIssues": [
-    "<list specific mistakes: missing signatures, missing dates, incomplete terms, ambiguous language, contradictory clauses, invalid references>"
-  ],
-  "suspiciousClauses": [
-    "<each item: specific clause name and why it is suspicious>"
-  ],
-  "missingClauses": [
-    "<each item: name the missing clause and why it matters>"
-  ],
-  "financialRisks": [
-    "<each item: specific financial or payment risk with amount/terms if present>"
-  ],
-  "expiryRisks": [
-    "<each item: specific deadline, expiry date, or time-sensitive obligation>"
-  ],
-  "unfairConditions": [
-    "<each item: specific unfair or one-sided condition>"
-  ],
-  "complianceIssues": [
-    "<each item: specific legal compliance or regulatory issue>"
-  ],
-  "privacyRisks": [
-    "<each item: data privacy or personal information risk>"
-  ],
-  "legalLoopholes": [
-    "<each item: specific legal loophole or exploitable ambiguity>"
-  ],
-  "warnings": [
-    "<each item: important general warning about this document>"
-  ],
-  "recommendations": [
-    "<each item: specific actionable recommendation to improve this document>"
-  ],
-  "finalVerdict": "<2-4 sentence professional conclusion: should the user proceed, modify, or seek legal review? Be specific and direct.>",
-  "safeToSign": <true | false>
+  "summary": "<5-8 sentence plain English summary>",
+  "riskLevel": "Low" or "Medium" or "High",
+  "riskReason": "<why this risk level>",
+  "documentIssues": ["<missing signatures>", "<missing dates>", "<incomplete terms>"],
+  "suspiciousClauses": ["<clause 1>", "<clause 2>"],
+  "missingClauses": ["<missing clause 1>"],
+  "financialRisks": ["<financial risk 1>"],
+  "expiryRisks": ["<deadline risk 1>"],
+  "unfairConditions": ["<unfair condition 1>"],
+  "complianceIssues": ["<compliance issue 1>"],
+  "privacyRisks": ["<privacy risk 1>"],
+  "legalLoopholes": ["<loophole 1>"],
+  "warnings": ["<important warning 1>"],
+  "recommendations": ["<recommendation 1>", "<recommendation 2>"],
+  "finalVerdict": "<2-3 sentence professional conclusion>",
+  "safeToSign": <true or false>
 }}
 
-IMPORTANT RULES:
-- documentStatus: "Legal" = valid and enforceable; "Illegal" = contains illegal terms; "Needs Review" = uncertain or risky
-- confidenceScore: your confidence in the analysis (0-100)
-- Every list must have at least 1 item if applicable, or [] if truly not applicable
-- Be specific — reference actual text from the document, not generic statements
-- safeToSign: true ONLY if documentStatus is Legal AND riskLevel is Low
-- Do NOT use phrases like "Demo mode" or "would appear here"
-- Always generate REAL analysis from the actual document content
+Rules:
+- Be specific, reference actual document content
+- Use plain English
+- safeToSign: true only if documentStatus is Legal AND riskLevel is Low
+- Every list must have at least 1 real item if applicable
 
-Document to analyze:
-{text}
-"""
+Document text:
+{text}"""
 
 
 async def analyze_legal_document(extracted_text: str) -> dict:
-    """Analyze a legal document using OpenAI and return structured results."""
-    key = (settings.OPENAI_API_KEY or "").strip()
+    """Analyze document using Gemini (free) or OpenAI (paid) fallback."""
 
-    if not key or key.startswith("sk-your") or key == "demo" or len(key) < 20:
-        logger.warning("OpenAI API key not configured")
-        return _no_key_response()
+    # Try Gemini first (free)
+    gemini_key = (settings.GEMINI_API_KEY or "").strip()
+    if gemini_key and len(gemini_key) > 10:
+        result = await _analyze_with_gemini(extracted_text, gemini_key)
+        if result:
+            return result
 
-    # Limit text — Render free tier has 30s request timeout
-    # Keep only 2000 chars for fast reliable analysis under timeout
-    text = extracted_text[:2000] if len(extracted_text) > 2000 else extracted_text
+    # Try OpenAI fallback (paid)
+    openai_key = (settings.OPENAI_API_KEY or "").strip()
+    if openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-your"):
+        result = await _analyze_with_openai(extracted_text, openai_key)
+        if result:
+            return result
 
+    logger.warning("No valid AI API key configured")
+    return _no_key_response()
+
+
+async def _analyze_with_gemini(text: str, api_key: str) -> dict:
+    """Use Google Gemini API (free tier)."""
     try:
-        client = AsyncOpenAI(api_key=key, timeout=20.0)
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # Gemini is fast — can handle more text
+        text_to_analyze = text[:5000] if len(text) > 5000 else text
+
+        response = model.generate_content(
+            PROMPT.format(text=text_to_analyze),
+            generation_config={
+                "temperature": 0.2,
+                "max_output_tokens": 2000,
+            }
+        )
+
+        raw = response.text.strip()
+
+        # Clean markdown code blocks if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+
+        analysis = json.loads(raw)
+        logger.info(f"Gemini analysis OK — status: {analysis.get('documentStatus')}")
+        return _validate(analysis)
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Gemini JSON parse error: {e}")
+        # Try to extract JSON from response
+        try:
+            import re
+            json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if json_match:
+                analysis = json.loads(json_match.group())
+                return _validate(analysis)
+        except Exception:
+            pass
+        return None
+    except Exception as e:
+        logger.error(f"Gemini error: {type(e).__name__}: {e}")
+        return None
+
+
+async def _analyze_with_openai(text: str, api_key: str) -> dict:
+    """Use OpenAI API (paid fallback)."""
+    try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=api_key, timeout=20.0)
+
+        text_to_analyze = text[:2000] if len(text) > 2000 else text
 
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a senior legal analyst. "
-                        "Always respond with a single valid JSON object only. "
-                        "No markdown, no code blocks, no explanation outside JSON."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": LEGAL_ANALYSIS_PROMPT.format(text=text),
-                },
+                {"role": "system", "content": "You are a legal analyst. Respond with valid JSON only."},
+                {"role": "user", "content": PROMPT.format(text=text_to_analyze)},
             ],
             temperature=0.2,
             max_tokens=1500,
             response_format={"type": "json_object"},
         )
 
-        raw = response.choices[0].message.content
-        analysis = json.loads(raw)
-        logger.info(f"AI analysis complete — status: {analysis.get('documentStatus')}, risk: {analysis.get('riskLevel')}")
+        analysis = json.loads(response.choices[0].message.content)
+        logger.info("OpenAI analysis OK")
         return _validate(analysis)
 
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error: {e}")
-        return _no_key_response()
     except Exception as e:
         logger.error(f"OpenAI error: {type(e).__name__}: {e}")
-        raise
+        return None
 
 
 def _validate(a: dict) -> dict:
@@ -132,10 +153,10 @@ def _validate(a: dict) -> dict:
     defaults = {
         "documentStatus": "Needs Review",
         "confidenceScore": 70,
-        "summary": "Document analysis completed.",
+        "summary": "Analysis completed.",
         "riskLevel": "Medium",
-        "riskReason": "Analysis completed with standard risk assessment.",
-        "finalVerdict": "Please review this document carefully before proceeding.",
+        "riskReason": "Standard risk assessment applied.",
+        "finalVerdict": "Please review this document carefully.",
         "safeToSign": False,
         **{f: [] for f in list_fields},
     }
@@ -144,39 +165,34 @@ def _validate(a: dict) -> dict:
         if key not in a or a[key] is None:
             a[key] = default
 
-    # Ensure lists
     for f in list_fields:
         if not isinstance(a[f], list):
             a[f] = [str(a[f])] if a[f] else []
 
-    # Normalize enums
     if a["documentStatus"] not in ["Legal", "Illegal", "Needs Review"]:
         a["documentStatus"] = "Needs Review"
     if a["riskLevel"] not in ["Low", "Medium", "High"]:
         a["riskLevel"] = "Medium"
-    if not isinstance(a["confidenceScore"], int):
-        try:
-            a["confidenceScore"] = int(a["confidenceScore"])
-        except Exception:
-            a["confidenceScore"] = 70
-    a["confidenceScore"] = max(0, min(100, a["confidenceScore"]))
+    try:
+        a["confidenceScore"] = max(0, min(100, int(a["confidenceScore"])))
+    except Exception:
+        a["confidenceScore"] = 70
 
     return a
 
 
 def _no_key_response() -> dict:
-    """Response when OpenAI key is not configured."""
     return {
         "documentStatus": "Needs Review",
         "confidenceScore": 0,
         "summary": (
-            "OpenAI API key is not configured. "
-            "Please add your OPENAI_API_KEY in the Render environment variables. "
-            "Without a valid API key, real AI analysis cannot be performed."
+            "No AI API key is configured. "
+            "Get a FREE Gemini API key at https://aistudio.google.com/apikey "
+            "and add it as GEMINI_API_KEY on Render."
         ),
         "riskLevel": "Medium",
-        "riskReason": "Cannot assess risk without AI analysis. Configure your OpenAI API key.",
-        "documentIssues": ["OpenAI API key not configured — real analysis unavailable"],
+        "riskReason": "Cannot assess risk without AI. Add GEMINI_API_KEY on Render (free).",
+        "documentIssues": ["AI key not configured — add GEMINI_API_KEY on Render"],
         "suspiciousClauses": [],
         "missingClauses": [],
         "financialRisks": [],
@@ -185,16 +201,11 @@ def _no_key_response() -> dict:
         "complianceIssues": [],
         "privacyRisks": [],
         "legalLoopholes": [],
-        "warnings": [
-            "AI analysis is disabled. Configure OPENAI_API_KEY on Render to enable real analysis."
-        ],
+        "warnings": ["Add your free Gemini API key to get real AI analysis"],
         "recommendations": [
-            "Go to Render → Environment → add OPENAI_API_KEY with your OpenAI key",
-            "Get a key at https://platform.openai.com/api-keys",
+            "Get free API key at https://aistudio.google.com/apikey",
+            "Add GEMINI_API_KEY to Render environment variables",
         ],
-        "finalVerdict": (
-            "Analysis could not be performed. "
-            "Please configure the OpenAI API key and re-upload the document."
-        ),
+        "finalVerdict": "Configure GEMINI_API_KEY on Render to enable free AI analysis.",
         "safeToSign": False,
     }
