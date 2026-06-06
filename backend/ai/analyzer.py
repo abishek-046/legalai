@@ -48,7 +48,8 @@ Document:
 
 async def analyze_legal_document(extracted_text: str) -> dict:
     """Analyze legal document using Groq free API."""
-    key = (settings.GROQ_API_KEY or "").strip()
+    import os
+    key = (settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "") or "").strip()
 
     if not key or len(key) < 10:
         logger.warning("GROQ_API_KEY not set")

@@ -95,14 +95,21 @@ async def debug():
 @app.get("/test-groq")
 async def test_groq():
     """Directly test Groq API with the configured key."""
+    import os
     from config import settings
-    key = (settings.GROQ_API_KEY or "").strip()
 
-    if not key:
-        return {"status": "error", "detail": "GROQ_API_KEY is not set on Render"}
+    # Check both sources
+    key_from_env = os.environ.get("GROQ_API_KEY", "").strip()
+    key_from_settings = (settings.GROQ_API_KEY or "").strip()
 
-    if len(key) < 10:
-        return {"status": "error", "detail": f"GROQ_API_KEY too short: {len(key)} chars"}
+    if not key_from_env and not key_from_settings:
+        return {
+            "status": "error",
+            "detail": "GROQ_API_KEY is not set on Render",
+            "os_env_keys": [k for k in os.environ.keys() if "GROQ" in k.upper() or "API" in k.upper()],
+        }
+
+    key = key_from_env or key_from_settings
 
     try:
         from groq import Groq
@@ -115,6 +122,7 @@ async def test_groq():
         return {
             "status": "ok",
             "groq_working": True,
+            "key_source": "os.environ" if key_from_env else "settings",
             "key_prefix": key[:8],
             "response": response.choices[0].message.content,
         }
