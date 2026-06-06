@@ -1,6 +1,5 @@
 """
-Application configuration using pydantic-settings
-Supabase version - replaces MongoDB settings with Supabase credentials.
+Application configuration
 """
 
 import json
@@ -19,11 +18,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    # OpenAI
-    OPENAI_API_KEY: str = ""
-    GEMINI_API_KEY: str = ""
-    GROQ_API_KEY: str = ""  # Free at https://console.groq.com
-    OCR_SPACE_API_KEY: str = "helloworld"  # Free OCR.space demo key
+    # Groq AI (free) - get key at https://console.groq.com
+    GROQ_API_KEY: str = ""
+
+    # OCR
+    OCR_SPACE_API_KEY: str = "helloworld"
 
     # App
     MAX_FILE_SIZE_MB: int = 10
@@ -33,9 +32,11 @@ class Settings(BaseSettings):
         "https://legalai-q2y8.vercel.app",
     ]
 
-    # Legacy - ignored but kept to avoid validation errors if still in env
+    # Legacy (ignored)
     MONGODB_URL: str = ""
     DATABASE_NAME: str = ""
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
 
     @property
     def origins_list(self) -> List[str]:
