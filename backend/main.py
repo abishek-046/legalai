@@ -71,41 +71,52 @@ async def health_check():
 
 @app.get("/debug")
 async def debug():
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     from config import settings
-    groq_key = (settings.GROQ_API_KEY or "").strip()
-    gemini_key = (settings.GEMINI_API_KEY or "").strip()
-    openai_key = (settings.OPENAI_API_KEY or "").strip()
-    url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
+    url = "".join(c for c in (settings.SUPABASE_URL or "") if c.isprintable()).strip()
     return {
         "supabase_url_set": "supabase" in url,
-        "supabase_key_set": len(settings.SUPABASE_KEY) > 10,
-        "groq_key_prefix": groq_key[:6] if groq_key else "NOT SET",
-        "groq_key_valid": len(groq_key) > 10 and groq_key.startswith("gsk_"),
-        "gemini_key_prefix": gemini_key[:8] if gemini_key else "NOT SET",
-        "gemini_key_valid": len(gemini_key) > 10 and gemini_key.startswith("AIzaSy"),
-        "openai_key_valid": len(openai_key) > 20 and not openai_key.startswith("sk-your"),
-        "ai_configured": (
-            (len(groq_key) > 10) or
-            (len(gemini_key) > 10) or
-            (len(openai_key) > 20 and not openai_key.startswith("sk-your"))
-        ),
+        "supabase_key_set": len(settings.SUPABASE_KEY or "") > 10,
+        "groq_key_set": bool(groq_key),
+        "groq_key_prefix": groq_key[:8] if groq_key else "NOT SET",
+        "groq_key_valid": groq_key.startswith("gsk_") if groq_key else False,
+        "openai_key_set": bool(openai_key),
+        "openai_key_prefix": openai_key[:8] if openai_key else "NOT SET",
+        "all_env_keys": sorted([k for k in os.environ.keys()]),
     }
 
 
 @app.get("/test-groq")
 async def test_groq():
-    """Test all available AI keys."""
-    import os
+    """Test Groq API connection."""
     groq_key = os.environ.get("GROQ_API_KEY", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
     result = {
         "groq_key_set": bool(groq_key),
+        "groq_key_prefix": groq_key[:8] if groq_key else "NOT SET",
         "openai_key_set": bool(openai_key),
-        "openai_key_prefix": openai_key[:8] if openai_key else "NOT SET",
+        "all_api_keys": [k for k in os.environ.keys() if "KEY" in k or "API" in k or "SECRET" in k],
     }
 
-    # Test OpenAI since it's available
+    # Test Groq
+    if groq_key:
+        try:
+            from groq import Groq
+            client = Groq(api_key=groq_key)
+            response = client.chat.completions.create(
+                model="llama3-70b-8192",
+                messages=[{"role": "user", "content": "Say OK"}],
+                max_tokens=5,
+            )
+            result["groq_working"] = True
+            result["groq_response"] = response.choices[0].message.content
+        except Exception as e:
+            result["groq_working"] = False
+            result["groq_error"] = str(e)
+
+    # Test OpenAI
     if openai_key:
         try:
             from openai import AsyncOpenAI
@@ -116,17 +127,19 @@ async def test_groq():
                 max_tokens=5,
             )
             result["openai_working"] = True
-            result["openai_response"] = response.choices[0].message.content
         except Exception as e:
             result["openai_working"] = False
-            result["openai_error"] = str(e)
+            result["openai_error"] = str(e)[:100]
 
     return result
+
+
+@app.get("/test-db")
 async def test_db():
     try:
         from database import get_supabase
         sb = get_supabase()
-        result = sb.table("users").select("id").limit(1).execute()
-        return {"status": "ok", "users_table": "accessible", "data": result.data}
+        res = sb.table("users").select("id").limit(1).execute()
+        return {"status": "ok", "users_table": "accessible", "data": res.data}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
