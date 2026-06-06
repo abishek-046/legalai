@@ -47,53 +47,79 @@ Document:
 
 
 async def analyze_legal_document(extracted_text: str) -> dict:
-    """Analyze legal document using Groq free API."""
+    """Analyze legal document - tries Groq then OpenAI."""
     import os
-    key = (settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "") or "").strip()
 
-    if not key or len(key) < 10:
-        logger.warning("GROQ_API_KEY not set")
-        return _no_key_response()
+    # Read from all possible sources
+    groq_key = (
+        os.environ.get("GROQ_API_KEY", "") or
+        getattr(settings, "GROQ_API_KEY", "") or ""
+    ).strip()
 
-    try:
-        from groq import Groq
-        client = Groq(api_key=key)
+    openai_key = (
+        os.environ.get("OPENAI_API_KEY", "") or
+        getattr(settings, "OPENAI_API_KEY", "") or ""
+    ).strip()
 
-        text = extracted_text[:5000] if len(extracted_text) > 5000 else extracted_text
+    logger.info(f"Keys available — Groq: {bool(groq_key and len(groq_key)>10)}, OpenAI: {bool(openai_key and len(openai_key)>10)}")
 
-        response = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a senior legal analyst. "
-                        "Respond with a single valid JSON object only. "
-                        "No markdown, no code blocks, no text outside JSON."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": PROMPT.format(text=text)
-                }
-            ],
-            temperature=0.2,
-            max_tokens=2000,
-        )
+    if groq_key and len(groq_key) > 10:
+        try:
+            return await _analyze_groq(extracted_text, groq_key)
+        except Exception as e:
+            logger.error(f"Groq failed: {e}")
 
-        raw = response.choices[0].message.content.strip()
-        result = _parse(raw)
+    if openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-your"):
+        logger.info("Using OpenAI")
+        try:
+            return await _analyze_openai(extracted_text, openai_key)
+        except Exception as e:
+            logger.error(f"OpenAI failed: {e}")
 
-        if result:
-            logger.info(f"Groq analysis OK — {result.get('documentStatus')} / {result.get('riskLevel')}")
-            return result
+    return _no_key_response()
 
-        logger.error("Groq returned unparseable response")
-        return _no_key_response()
 
-    except Exception as e:
-        logger.error(f"Groq error: {type(e).__name__}: {e}")
-        raise
+async def _analyze_groq(extracted_text: str, key: str) -> dict:
+    from groq import Groq
+    client = Groq(api_key=key)
+    text = extracted_text[:5000] if len(extracted_text) > 5000 else extracted_text
+    response = client.chat.completions.create(
+        model="llama3-70b-8192",
+        messages=[
+            {"role": "system", "content": "You are a senior legal analyst. Respond with valid JSON only. No markdown."},
+            {"role": "user", "content": PROMPT.format(text=text)}
+        ],
+        temperature=0.2,
+        max_tokens=2000,
+    )
+    raw = response.choices[0].message.content.strip()
+    result = _parse(raw)
+    if result:
+        logger.info(f"Groq OK — {result.get('documentStatus')} / {result.get('riskLevel')}")
+        return result
+    raise ValueError("Groq returned unparseable JSON")
+
+
+async def _analyze_openai(extracted_text: str, key: str) -> dict:
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(api_key=key, timeout=25.0)
+    text = extracted_text[:3000] if len(extracted_text) > 3000 else extracted_text
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a senior legal analyst. Respond with valid JSON only."},
+            {"role": "user", "content": PROMPT.format(text=text)},
+        ],
+        temperature=0.2,
+        max_tokens=2000,
+        response_format={"type": "json_object"},
+    )
+    raw = response.choices[0].message.content
+    result = _parse(raw)
+    if result:
+        logger.info(f"OpenAI OK — {result.get('documentStatus')} / {result.get('riskLevel')}")
+        return result
+    raise ValueError("OpenAI returned unparseable JSON")
 
 
 def _parse(raw: str) -> dict:
