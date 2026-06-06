@@ -1,9 +1,7 @@
 """
-Document service - Supabase version
-Handles document storage and retrieval using Supabase (PostgreSQL).
+Document service - Supabase version (Enhanced)
 """
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -14,10 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def _serialize(doc: dict) -> dict:
-    """Normalize Supabase row to match frontend expectations."""
     if not doc:
         return None
-    # Map snake_case DB columns to camelCase for frontend
     return {
         "id": doc.get("id"),
         "userId": doc.get("user_id"),
@@ -25,13 +21,21 @@ def _serialize(doc: dict) -> dict:
         "documentType": doc.get("document_type"),
         "summary": doc.get("summary"),
         "riskLevel": doc.get("risk_level"),
+        "riskReason": doc.get("risk_reason"),
+        "documentStatus": doc.get("document_status"),
+        "confidenceScore": doc.get("confidence_score"),
+        "documentIssues": doc.get("document_issues") or [],
         "warnings": doc.get("warnings") or [],
         "suspiciousClauses": doc.get("suspicious_clauses") or [],
         "missingClauses": doc.get("missing_clauses") or [],
         "financialRisks": doc.get("financial_risks") or [],
         "expiryRisks": doc.get("expiry_risks") or [],
         "unfairConditions": doc.get("unfair_conditions") or [],
+        "complianceIssues": doc.get("compliance_issues") or [],
+        "privacyRisks": doc.get("privacy_risks") or [],
+        "legalLoopholes": doc.get("legal_loopholes") or [],
         "recommendations": doc.get("recommendations") or [],
+        "finalVerdict": doc.get("final_verdict"),
         "safeToSign": doc.get("safe_to_sign"),
         "createdAt": doc.get("created_at"),
     }
@@ -44,7 +48,6 @@ async def save_document(
     extracted_text: str,
     analysis: dict,
 ) -> dict:
-    """Save a document and its AI analysis to Supabase."""
     sb = get_supabase()
 
     row = {
@@ -54,13 +57,21 @@ async def save_document(
         "extracted_text": extracted_text[:5000],
         "summary": analysis.get("summary", ""),
         "risk_level": analysis.get("riskLevel", "Medium"),
+        "risk_reason": analysis.get("riskReason", ""),
+        "document_status": analysis.get("documentStatus", "Needs Review"),
+        "confidence_score": analysis.get("confidenceScore", 0),
+        "document_issues": analysis.get("documentIssues", []),
         "warnings": analysis.get("warnings", []),
         "suspicious_clauses": analysis.get("suspiciousClauses", []),
         "missing_clauses": analysis.get("missingClauses", []),
         "financial_risks": analysis.get("financialRisks", []),
         "expiry_risks": analysis.get("expiryRisks", []),
         "unfair_conditions": analysis.get("unfairConditions", []),
+        "compliance_issues": analysis.get("complianceIssues", []),
+        "privacy_risks": analysis.get("privacyRisks", []),
+        "legal_loopholes": analysis.get("legalLoopholes", []),
         "recommendations": analysis.get("recommendations", []),
+        "final_verdict": analysis.get("finalVerdict", ""),
         "safe_to_sign": analysis.get("safeToSign", False),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -69,7 +80,7 @@ async def save_document(
     if not result.data:
         raise RuntimeError("Failed to save document to database")
 
-    logger.info(f"Document saved: {filename} for user {user_id}")
+    logger.info(f"Saved: {filename} — {analysis.get('documentStatus')} / {analysis.get('riskLevel')}")
     return _serialize(result.data[0])
 
 
@@ -79,16 +90,13 @@ async def get_user_documents(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> List[dict]:
-    """Get all documents for a user with optional filters."""
     sb = get_supabase()
-
     query = (
         sb.table("documents")
-        .select("id,user_id,filename,document_type,risk_level,safe_to_sign,created_at")
+        .select("id,user_id,filename,document_type,risk_level,document_status,confidence_score,safe_to_sign,created_at")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
     )
-
     if search:
         query = query.ilike("filename", f"%{search}%")
     if date_from:
@@ -101,7 +109,6 @@ async def get_user_documents(
 
 
 async def get_document_by_id(doc_id: str, user_id: str) -> Optional[dict]:
-    """Get a single document by ID, ensuring it belongs to the user."""
     sb = get_supabase()
     try:
         result = (
@@ -113,12 +120,11 @@ async def get_document_by_id(doc_id: str, user_id: str) -> Optional[dict]:
         )
         return _serialize(result.data[0]) if result.data else None
     except Exception as e:
-        logger.error(f"Error fetching document {doc_id}: {e}")
+        logger.error(f"Error fetching {doc_id}: {e}")
         return None
 
 
 async def delete_document(doc_id: str, user_id: str) -> bool:
-    """Delete a document by ID, ensuring it belongs to the user."""
     sb = get_supabase()
     try:
         result = (
@@ -128,10 +134,10 @@ async def delete_document(doc_id: str, user_id: str) -> bool:
             .eq("user_id", user_id)
             .execute()
         )
-        deleted = len(result.data) > 0 if result.data else False
+        deleted = bool(result.data)
         if deleted:
-            logger.info(f"Document deleted: {doc_id}")
+            logger.info(f"Deleted: {doc_id}")
         return deleted
     except Exception as e:
-        logger.error(f"Error deleting document {doc_id}: {e}")
+        logger.error(f"Delete error {doc_id}: {e}")
         return False
