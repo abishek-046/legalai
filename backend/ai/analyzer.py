@@ -50,11 +50,16 @@ async def analyze_legal_document(extracted_text: str) -> dict:
     """Analyze legal document using available AI key."""
     import os
 
-    # Check all possible keys
-    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    # Check all possible env var names for Groq
+    groq_key = (
+        os.environ.get("GROQ_API_KEY", "") or
+        os.environ.get("GROQ_KEY", "") or
+        os.environ.get("groq_api_key", "") or
+        ""
+    ).strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
-    logger.info(f"Groq key present: {bool(groq_key)}, OpenAI key present: {bool(openai_key)}")
+    logger.info(f"ENV CHECK — GROQ_API_KEY: {'SET' if groq_key else 'NOT SET'}, all keys with GROQ: {[k for k in os.environ if 'GROQ' in k.upper()]}")
 
     # Try Groq
     if groq_key and len(groq_key) > 10:

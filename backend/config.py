@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # Groq AI (free) - get key at https://console.groq.com
     GROQ_API_KEY: str = ""
+    # Also check alternative env var names Render might use
+    GROQ_KEY: str = ""
 
     # OCR
     OCR_SPACE_API_KEY: str = "helloworld"

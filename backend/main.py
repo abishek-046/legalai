@@ -97,7 +97,7 @@ async def test_groq():
         "groq_key_set": bool(groq_key),
         "groq_key_prefix": groq_key[:8] if groq_key else "NOT SET",
         "openai_key_set": bool(openai_key),
-        "all_api_keys": [k for k in os.environ.keys() if "KEY" in k or "API" in k or "SECRET" in k],
+        "all_env_key_names": sorted(list(os.environ.keys())),
     }
 
     # Test Groq
