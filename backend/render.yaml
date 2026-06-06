@@ -4,23 +4,28 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: "./build.sh"
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
-      - key: MONGODB_URL
-        sync: false
-      - key: DATABASE_NAME
-        value: legal_assistant
       - key: SECRET_KEY
         sync: false
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 60
-      - key: OPENAI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: OCR_SPACE_API_KEY
+        value: helloworld
       - key: MAX_FILE_SIZE_MB
         value: 10
       - key: ALLOWED_ORIGINS
         sync: false
-        
+      - key: PYTHON_VERSION
+        value: 3.11.9
