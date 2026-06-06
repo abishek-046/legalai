@@ -13,7 +13,7 @@ from config import settings
 from routes.dependencies import get_current_user
 from services.document_service import save_document
 from utils.ocr import extract_text_async, get_document_type
-from ai.analyzer import analyze_legal_document
+from ai.analyzer import analyze_legal_document, _no_key_response as _fallback_analysis
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,15 +106,18 @@ async def analyze_document(
 
     logger.info(f"Extracted {len(extracted_text)} characters from '{file.filename}'")
 
-    # ── AI Analysis ──────────────────────────────────────────────────────────
+    # AI Analysis
     try:
         analysis = await analyze_legal_document(extracted_text)
     except Exception as e:
         logger.error(f"AI analysis failed for '{file.filename}': {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI analysis service is temporarily unavailable. Please try again.",
+        analysis = _fallback_analysis()
+        analysis["summary"] = (
+            f"Text was extracted from '{file.filename}' ({len(extracted_text)} characters) "
+            "but AI analysis failed due to a timeout or service error. "
+            "Please try again with a smaller document or check your OpenAI API key on Render."
         )
+        analysis["documentIssues"] = [f"AI analysis error: {str(e)[:100]}"]
 
     # ── Save to database ─────────────────────────────────────────────────────
     try:
