@@ -19,7 +19,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
 limiter = Limiter(key_func=get_remote_address)
 
 
@@ -27,20 +26,14 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     logger.info("Starting Legal Assistant API...")
     yield
-    logger.info("Shutting down Legal Assistant API...")
+    logger.info("Shutting down.")
 
 
-app = FastAPI(
-    title="Legal Documentation Assistant API",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title="Legal Documentation Assistant API", version="1.0.0", lifespan=lifespan)
 
-# Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS — allow all origins to fix deployment issues
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -49,13 +42,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Uploads directory
 try:
     os.makedirs("uploads", exist_ok=True)
 except Exception:
     pass
 
-# Routers
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(documents.router, prefix="/api", tags=["Documents"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
@@ -74,24 +65,29 @@ async def health_check():
         sb.table("users").select("id").limit(1).execute()
         db_status = "connected"
     except Exception as e:
-        db_status = f"disconnected: {str(e)[:100]}"
+        db_status = f"disconnected: {str(e)[:80]}"
     return {"status": "healthy", "database": db_status}
 
 
-@app.get("/test-register")
-async def test_register():
-    """Test the full registration flow."""
-    try:
-        from services.auth_service import register_user, create_access_token
-        import time
-        test_email = f"test{int(time.time())}@test.com"
-        user = await register_user("Test User", test_email, "password123")
-        token = create_access_token({"sub": str(user["id"])})
-        return {"status": "ok", "user_id": str(user["id"]), "email": test_email}
-    except Exception as e:
-        return {"status": "error", "detail": str(e), "type": type(e).__name__}
+@app.get("/debug")
+async def debug():
+    from config import settings
+    key = settings.OPENAI_API_KEY.strip() if settings.OPENAI_API_KEY else ""
+    url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
+    return {
+        "supabase_url_preview": url[:40] if url else "NOT SET",
+        "supabase_url_set": "supabase" in url,
+        "supabase_key_set": len(settings.SUPABASE_KEY) > 10,
+        "secret_key_set": bool(settings.SECRET_KEY),
+        "openai_key_prefix": key[:8] if key else "NOT SET",
+        "openai_key_length": len(key),
+        "openai_key_valid": len(key) > 20 and not key.startswith("sk-your"),
+        "ocr_space_key_set": bool(getattr(settings, "OCR_SPACE_API_KEY", "")),
+    }
+
+
+@app.get("/test-db")
 async def test_db():
-    """Test Supabase connection and table access."""
     try:
         from database import get_supabase
         sb = get_supabase()
@@ -99,39 +95,3 @@ async def test_db():
         return {"status": "ok", "users_table": "accessible", "data": result.data}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
-
-
-@app.get("/test-pdf")
-async def test_pdf_extraction():
-    """Test what each PDF extraction method returns for debugging."""
-    return {
-        "message": "POST a PDF file to /api/analyze to test extraction",
-        "pymupdf_available": _check_pymupdf(),
-        "pdfplumber_available": _check_pdfplumber(),
-    }
-
-
-def _check_pymupdf():
-    try:
-        import fitz
-        return f"available v{fitz.version[0]}"
-    except ImportError:
-        return "NOT installed"
-
-
-def _check_pdfplumber():
-    try:
-        import pdfplumber
-        return "available"
-    except ImportError:
-        return "NOT installed"
-async def debug():
-    from config import settings
-    url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
-    return {
-        "supabase_url_preview": url[:40] if url else "NOT SET",
-        "supabase_url_set": "supabase" in url,
-        "supabase_key_set": len(settings.SUPABASE_KEY) > 10,
-        "secret_key_set": bool(settings.SECRET_KEY),
-        "openai_key_set": len(settings.OPENAI_API_KEY) > 5,
-    }
