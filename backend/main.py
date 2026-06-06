@@ -72,17 +72,22 @@ async def health_check():
 @app.get("/debug")
 async def debug():
     from config import settings
-    key = settings.OPENAI_API_KEY.strip() if settings.OPENAI_API_KEY else ""
+    openai_key = (settings.OPENAI_API_KEY or "").strip()
+    gemini_key = (settings.GEMINI_API_KEY or "").strip()
     url = "".join(c for c in settings.SUPABASE_URL if c.isprintable()).strip()
     return {
-        "supabase_url_preview": url[:40] if url else "NOT SET",
         "supabase_url_set": "supabase" in url,
+        "supabase_url_preview": url[:40] if url else "NOT SET",
         "supabase_key_set": len(settings.SUPABASE_KEY) > 10,
         "secret_key_set": bool(settings.SECRET_KEY),
-        "openai_key_prefix": key[:8] if key else "NOT SET",
-        "openai_key_length": len(key),
-        "openai_key_valid": len(key) > 20 and not key.startswith("sk-your"),
-        "ocr_space_key_set": bool(getattr(settings, "OCR_SPACE_API_KEY", "")),
+        "openai_key_prefix": openai_key[:8] if openai_key else "NOT SET",
+        "openai_key_valid": len(openai_key) > 20 and not openai_key.startswith("sk-your"),
+        "gemini_key_prefix": gemini_key[:8] if gemini_key else "NOT SET",
+        "gemini_key_valid": len(gemini_key) > 10 and gemini_key.startswith("AIzaSy"),
+        "ai_configured": (
+            (len(gemini_key) > 10 and gemini_key.startswith("AIzaSy")) or
+            (len(openai_key) > 20 and not openai_key.startswith("sk-your"))
+        ),
     }
 
 
