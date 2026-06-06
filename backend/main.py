@@ -92,7 +92,39 @@ async def debug():
     }
 
 
-@app.get("/test-db")
+@app.get("/test-groq")
+async def test_groq():
+    """Directly test Groq API with the configured key."""
+    from config import settings
+    key = (settings.GROQ_API_KEY or "").strip()
+
+    if not key:
+        return {"status": "error", "detail": "GROQ_API_KEY is not set on Render"}
+
+    if len(key) < 10:
+        return {"status": "error", "detail": f"GROQ_API_KEY too short: {len(key)} chars"}
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=key)
+        response = client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{"role": "user", "content": "Say OK"}],
+            max_tokens=5,
+        )
+        return {
+            "status": "ok",
+            "groq_working": True,
+            "key_prefix": key[:8],
+            "response": response.choices[0].message.content,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "groq_working": False,
+            "key_prefix": key[:8],
+            "detail": str(e),
+        }
 async def test_db():
     try:
         from database import get_supabase
