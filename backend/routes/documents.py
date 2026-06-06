@@ -130,10 +130,10 @@ async def analyze_document(
             analysis=analysis,
         )
     except Exception as e:
-        logger.error(f"Failed to save document '{file.filename}': {e}")
+        logger.error(f"Failed to save document '{file.filename}': {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Analysis complete but failed to save report. Please try again.",
+            detail=f"Analysis complete but failed to save report: {str(e)[:200]}",
         )
 
     logger.info(f"Document '{file.filename}' analyzed and saved as report {saved_doc['id']}")
