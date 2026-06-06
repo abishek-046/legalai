@@ -156,36 +156,34 @@ def extract_from_pdf_sync(file_bytes: bytes) -> str:
 
 async def extract_from_pdf(file_bytes: bytes, filename: str = "doc.pdf") -> str:
     """
-    Full PDF extraction pipeline:
-    1. Try direct text extraction (fast, for text PDFs)
-    2. Fall back to OCR.space (for scanned PDFs)
+    Full PDF extraction pipeline - optimized for speed on Render free tier.
+    Only processes first 3 pages to stay under 30s timeout.
     """
     from config import settings
 
     logger.info(f"PDF: {filename} ({len(file_bytes)} bytes)")
 
-    # Step 1: direct text extraction
+    # For large PDFs, trim to first 3 pages before processing
+    if len(file_bytes) > 500_000:
+        logger.info("Large PDF detected — trimming to first 3 pages for speed")
+        file_bytes = _trim_pdf(file_bytes, max_pages=3)
+
+    # Step 1: direct text extraction (fast)
     text = extract_from_pdf_sync(file_bytes)
     if len(text.strip()) >= PDF_MIN_CHARS:
         return text
 
     # Step 2: OCR.space for scanned PDF
-    logger.info("Direct extraction insufficient — using OCR.space for scanned PDF")
-
-    # OCR.space has 1MB limit on free tier — split large PDFs
-    if len(file_bytes) > 900_000:
-        logger.info("PDF > 900KB — extracting first pages only for OCR")
-        file_bytes = _trim_pdf(file_bytes, max_pages=5)
+    logger.info("Direct extraction insufficient — using OCR.space")
 
     ocr_text = await _ocr_space_from_bytes(
         file_bytes, filename, settings.OCR_SPACE_API_KEY, is_pdf=True
     )
 
     if len(ocr_text.strip()) >= 20:
-        logger.info(f"OCR.space PDF OK: {len(ocr_text)} chars")
+        logger.info(f"OCR.space OK: {len(ocr_text)} chars")
         return clean_text(ocr_text)
 
-    # Return whatever we have
     logger.warning(f"All PDF methods limited. Best: {len(text)} chars")
     return text
 

@@ -80,12 +80,12 @@ async def analyze_legal_document(extracted_text: str) -> dict:
         logger.warning("OpenAI API key not configured")
         return _no_key_response()
 
-    # Limit text — large PDFs cause timeouts on Render free tier
-    # Use first 3000 chars for fast reliable analysis
-    text = extracted_text[:3000] if len(extracted_text) > 3000 else extracted_text
+    # Limit text — Render free tier has 30s request timeout
+    # Keep only 2000 chars for fast reliable analysis under timeout
+    text = extracted_text[:2000] if len(extracted_text) > 2000 else extracted_text
 
     try:
-        client = AsyncOpenAI(api_key=key, timeout=40.0)
+        client = AsyncOpenAI(api_key=key, timeout=20.0)
 
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
@@ -104,7 +104,7 @@ async def analyze_legal_document(extracted_text: str) -> dict:
                 },
             ],
             temperature=0.2,
-            max_tokens=2500,
+            max_tokens=1500,
             response_format={"type": "json_object"},
         )
 
